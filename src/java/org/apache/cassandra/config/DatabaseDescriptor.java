@@ -522,8 +522,15 @@ public class DatabaseDescriptor
             int minSize = 0;
             try
             {
+                // If we are dealing with a large enough filesystem, the size will overflow the long.
+                // If that is the case, set the value to the maximum value for a long
+                // See https://bugs.openjdk.java.net/browse/JDK-8162520
+                long totalSpace = guessFileStore(conf.commitlog_directory).getTotalSpace();
+                if (totalSpace < 0) {
+                    totalSpace = Long.MAX_VALUE;
+                }
                 // use 1/4 of available space.  See discussion on #10013 and #10199
-                minSize = Ints.checkedCast((guessFileStore(conf.commitlog_directory).getTotalSpace() / 1048576) / 4);
+                minSize = Ints.saturatedCast((totalSpace / 1048576) / 4);
             }
             catch (IOException e)
             {
@@ -571,7 +578,16 @@ public class DatabaseDescriptor
 
             try
             {
-                dataFreeBytes += guessFileStore(datadir).getUnallocatedSpace();
+                long unallocatedSpace = guessFileStore(datadir).getUnallocatedSpace();
+                // If we are dealing with a large enough filesystem, the size will overflow the long
+                // If that is the case, set the value to the maximum value for a long
+                // See https://bugs.openjdk.java.net/browse/JDK-8162520
+                if (unallocatedSpace < 0) {
+                    unallocatedSpace = Long.MAX_VALUE;
+                }
+
+                // if there is a long overflow, set the value to Long.MAX_VALUE
+                dataFreeBytes = (dataFreeBytes + unallocatedSpace < 0) ? Long.MAX_VALUE : dataFreeBytes + unallocatedSpace;
             }
             catch (IOException e)
             {

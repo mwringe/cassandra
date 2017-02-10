@@ -523,7 +523,15 @@ public class Directories
 
         public long getAvailableSpace()
         {
-            long availableSpace = location.getUsableSpace() - DatabaseDescriptor.getMinFreeSpacePerDriveInBytes();
+            long usableSpace = location.getUsableSpace();
+            // If we are dealing with a large enough filesystem, the size will overflow the long.
+            // If that is the case, set the value to the maximum value for a long
+            // See https://bugs.openjdk.java.net/browse/JDK-8162520
+            if (usableSpace < 0) {
+                usableSpace = Long.MAX_VALUE;
+            }
+
+            long availableSpace = usableSpace - DatabaseDescriptor.getMinFreeSpacePerDriveInBytes();
             return availableSpace > 0 ? availableSpace : 0;
         }
 
